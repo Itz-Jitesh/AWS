@@ -98,7 +98,11 @@ describe("TaskCreationForm", () => {
 
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({
-        repo_source: { kind: "zip", filename: "insecure-bucket.zip" },
+        repo_source: {
+          kind: "zip",
+          filename: "insecure-bucket.zip",
+          file: expect.any(File),
+        },
         goal: "Make the bucket private without deleting it.",
         mode: "build",
       }),

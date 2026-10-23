@@ -34,6 +34,8 @@ export type TaskState =
   | "REPAIRING"
   | "REVIEW_READY"
   | "AWAITING_APPROVAL"
+  | "APPLYING"
+  | "POST_DEPLOY_CHECKS"
   | "COMPLETE";
 
 export interface CheckRun {

@@ -4,7 +4,17 @@ import type { Requirement } from "@/lib/contracts";
 import { EmptyState } from "./Panel";
 import { RequirementStatusBadge } from "./badges";
 
-export function RequirementsPanel({ requirements }: { requirements: Requirement[] }) {
+export function RequirementsPanel({
+  requirements,
+  onExtract,
+  extracting = false,
+  unavailableReason,
+}: {
+  requirements: Requirement[];
+  onExtract?: (() => Promise<void>) | undefined;
+  extracting?: boolean;
+  unavailableReason?: string | undefined;
+}) {
   const unverified = requirements.filter(
     (requirement) => requirement.status === "Unverified",
   ).length;
@@ -26,10 +36,26 @@ export function RequirementsPanel({ requirements }: { requirements: Requirement[
       </div>
 
       {requirements.length === 0 ? (
-        <EmptyState
-          message="No requirements extracted yet."
-          hint="Requirements are derived from the task goal and re-checked after each patch."
-        />
+        <div className="flex flex-col gap-2">
+          <EmptyState
+            message="No requirements extracted yet."
+            hint={
+              unavailableReason ??
+              "Requirements are derived from the task goal and re-checked after each patch."
+            }
+          />
+          {onExtract ? (
+            <button
+              type="button"
+              data-testid="extract-requirements"
+              onClick={() => void onExtract()}
+              disabled={extracting}
+              className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {extracting ? "Extracting requirements…" : "Extract requirements"}
+            </button>
+          ) : null}
+        </div>
       ) : (
         <ul className="flex flex-col gap-2.5">
           {requirements.map((requirement) => (

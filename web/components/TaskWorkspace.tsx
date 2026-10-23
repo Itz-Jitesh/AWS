@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ApiError, type TaskWorkspace as Workspace } from "@/lib/api";
 import { getApiClient } from "@/lib/client";
-import { collectLimitations, collectToolVersions } from "@/lib/report";
+import {
+  collectIntegrationLimitations,
+  collectLimitations,
+  collectToolVersions,
+} from "@/lib/report";
 import { isBlockingStatus } from "@/lib/ui";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { Banner, EmptyState, Panel } from "./Panel";
@@ -14,6 +18,7 @@ import { FindingsList } from "./FindingsList";
 import { PatchPanel } from "./PatchPanel";
 import { PlanSummaryPanel } from "./PlanSummaryPanel";
 import { RequirementsPanel } from "./RequirementsPanel";
+import { ServiceNotice } from "./ServiceNotice";
 import { StateBadge } from "./badges";
 
 type LoadState =
@@ -29,9 +34,15 @@ function toErrorState(error: unknown): LoadState {
   };
 }
 
+function actionMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export function TaskWorkspace({ taskId }: { taskId: string }) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [busy, setBusy] = useState<"checks" | "patch" | null>(null);
+  const [busy, setBusy] = useState<"checks" | "patch" | "requirements" | "capture" | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -65,24 +76,53 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
       await getApiClient().runCheckSuite(taskId);
       await refresh();
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "The check suite failed to run.",
-      );
+      setActionError(actionMessage(error, "The check suite failed to run."));
     } finally {
       setBusy(null);
     }
   }
 
   async function generatePatch() {
+    const api = getApiClient();
+    if (!api.generatePatch) return;
     setActionError(null);
     setBusy("patch");
     try {
-      await getApiClient().generatePatch(taskId);
+      await api.generatePatch(taskId);
       await refresh();
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : "Patch generation failed.",
-      );
+      setActionError(actionMessage(error, "Patch generation failed."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function extractRequirements() {
+    const api = getApiClient();
+    if (!api.extractRequirements) return;
+    const goal = state.kind === "ready" ? state.workspace.task.goal : "";
+    setActionError(null);
+    setBusy("requirements");
+    try {
+      await api.extractRequirements(taskId, goal);
+      await refresh();
+    } catch (error) {
+      setActionError(actionMessage(error, "Requirements extraction failed."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function capturePlan() {
+    const api = getApiClient();
+    if (!api.capturePlan) return;
+    setActionError(null);
+    setBusy("capture");
+    try {
+      await api.capturePlan(taskId);
+      await refresh();
+    } catch (error) {
+      setActionError(actionMessage(error, "Plan capture failed."));
     } finally {
       setBusy(null);
     }
@@ -135,6 +175,30 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
 
   const { workspace } = state;
   const { task, plan_summary: planSummary, approval } = workspace;
+  const api = getApiClient();
+  const support = api.support;
+  const notes = api.operationNotes?.() ?? {};
+  const patchUnavailable =
+    support.generatePatch === "unavailable"
+      ? (notes.generatePatch?.detail ??
+        "Patch generation is unavailable in this backend.")
+      : undefined;
+  const findingsUnavailable =
+    support.findings === "unavailable"
+      ? (notes.findings?.detail ?? "Findings are unavailable in this backend.")
+      : undefined;
+  const planUnavailable =
+    support.planSummary === "unavailable"
+      ? (notes.planSummary?.detail ?? "Plan classification is unavailable in this backend.")
+      : undefined;
+  const approvalUnavailable =
+    support.approveTask === "unavailable"
+      ? (notes.approveTask?.detail ?? "Approval is unavailable in this backend.")
+      : undefined;
+  const reportUnavailable =
+    support.getEvidenceReport === "unavailable"
+      ? (notes.getEvidenceReport?.detail ?? "The evidence report endpoint is unavailable.")
+      : undefined;
 
   const blockingChecks = workspace.checks.filter((check) =>
     isBlockingStatus(check.status),
@@ -157,6 +221,15 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-mono text-xs text-ink-dim">{task.task_id}</span>
           <StateBadge state={task.state} />
+          {api.backend === "worker-direct" ? (
+            <span
+              data-testid="state-derived-note"
+              className="rounded border border-line px-1.5 py-0.5 text-[11px] text-ink-dim"
+              title="Server-side task states arrive with the orchestration task read model (DEC-04 pending)."
+            >
+              client-derived
+            </span>
+          ) : null}
           <span className="rounded border border-line px-1.5 py-0.5 text-[11px] font-semibold tracking-wide text-ink-muted uppercase">
             {task.mode} mode
           </span>
@@ -174,11 +247,16 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
               type="button"
               data-testid="generate-patch"
               onClick={generatePatch}
-              disabled={busy !== null || task.mode === "audit"}
+              disabled={
+                busy !== null ||
+                task.mode === "audit" ||
+                support.generatePatch === "unavailable" ||
+                !api.generatePatch
+              }
               title={
                 task.mode === "audit"
                   ? "Patch generation is only available in build mode."
-                  : undefined
+                  : patchUnavailable
               }
               className="rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -193,7 +271,21 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
           </p>
           <p className="mt-1 text-lg leading-snug font-medium text-ink">{task.goal}</p>
         </div>
+
+        {workspace.ingest ? (
+          <p className="text-xs text-ink-muted" data-testid="ingest-summary">
+            Ingested {workspace.ingest.tf_files.length} .tf file(s)
+            {workspace.ingest.providers.length > 0
+              ? ` · providers: ${workspace.ingest.providers.map((provider) => provider.name).join(", ")}`
+              : ""}
+            {workspace.ingest.warnings.length > 0
+              ? ` · ${workspace.ingest.warnings.length} ingestion warning(s)`
+              : ""}
+          </p>
+        ) : null}
       </header>
+
+      <ServiceNotice api={api} />
 
       {actionError ? (
         <Banner tone="danger" title="Action failed" testId="action-error">
@@ -262,7 +354,20 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
             description="Extracted from the goal and re-checked after each patch."
             testId="panel-requirements"
           >
-            <RequirementsPanel requirements={workspace.requirements} />
+            <RequirementsPanel
+              requirements={workspace.requirements}
+              extracting={busy === "requirements"}
+              unavailableReason={
+                support.extractRequirements === "unavailable"
+                  ? (notes.extractRequirements?.detail ?? undefined)
+                  : undefined
+              }
+              onExtract={
+                support.extractRequirements === "available" && api.extractRequirements
+                  ? extractRequirements
+                  : undefined
+              }
+            />
           </Panel>
 
           <Panel
@@ -273,6 +378,7 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
             <FindingsList
               findings={workspace.findings}
               baseline={workspace.baseline_findings}
+              unavailableReason={findingsUnavailable}
             />
           </Panel>
         </div>
@@ -283,7 +389,17 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
             description="Classified from terraform show -json output."
             testId="panel-plan"
           >
-            <PlanSummaryPanel planSummary={planSummary} />
+            <PlanSummaryPanel
+              planSummary={planSummary}
+              capture={workspace.plan_capture}
+              capturing={busy === "capture"}
+              unavailableReason={planUnavailable}
+              onCapture={
+                support.capturePlan === "available" && api.capturePlan && !planSummary
+                  ? capturePlan
+                  : undefined
+              }
+            />
           </Panel>
 
           <Panel
@@ -292,8 +408,12 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
             testId="panel-approval"
           >
             <ApprovalPanel
+              state={workspace.task.state}
+              approvalValid={workspace.task.approval_valid}
               planSummary={planSummary}
               approval={approval}
+              capture={workspace.plan_capture}
+              unavailableReason={approvalUnavailable}
               onApprove={approve}
             />
           </Panel>
@@ -305,7 +425,7 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
         description="Minimal unified diff. The repository is never rewritten wholesale."
         testId="panel-patch"
       >
-        <PatchPanel patch={workspace.patch} />
+        <PatchPanel patch={workspace.patch} unavailableReason={patchUnavailable} />
       </Panel>
 
       <Panel
@@ -315,8 +435,13 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
       >
         <EvidencePanel
           taskId={task.task_id}
-          limitations={collectLimitations(workspace)}
+          limitations={[
+            ...collectLimitations(workspace),
+            ...collectIntegrationLimitations(api),
+          ]}
           toolVersions={collectToolVersions(workspace.checks)}
+          reportSupported={support.getEvidenceReport !== "unavailable"}
+          unavailableReason={reportUnavailable}
           onDownload={() => getApiClient().getEvidenceReport(task.task_id)}
         />
       </Panel>

@@ -83,7 +83,7 @@ export function TaskCreationForm({
         input:
           Object.keys(next).length === 0 && zipFile
             ? {
-                repo_source: { kind: "zip", filename: zipFile.name },
+                repo_source: { kind: "zip", filename: zipFile.name, file: zipFile },
                 goal: trimmedGoal,
                 mode,
               }

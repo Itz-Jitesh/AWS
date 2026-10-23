@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getApiClient } from "@/lib/client";
 
 function Logo() {
   return (
@@ -42,7 +43,14 @@ export function AppShell({
   children: ReactNode;
   dataSourceLabel?: string;
 }) {
-  const usingMocks = !process.env.NEXT_PUBLIC_API_BASE_URL;
+  const backend = getApiClient().backend;
+  const usingMocks = backend === "mock";
+  const fallbackLabel =
+    backend === "orchestration"
+      ? "Live API (orchestration)"
+      : backend === "worker-direct"
+        ? "Live worker (direct)"
+        : "Mock services";
 
   return (
     <div className="flex min-h-full flex-col">
@@ -73,7 +81,7 @@ export function AppShell({
                 : "border-emerald-700/60 bg-emerald-950/70 text-emerald-300"
             }`}
           >
-            {dataSourceLabel ?? (usingMocks ? "Mock services" : "Live API")}
+            {dataSourceLabel ?? fallbackLabel}
           </span>
         </div>
       </header>
@@ -83,8 +91,8 @@ export function AppShell({
       <footer className="border-t border-line px-6 py-5">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-1 text-xs text-ink-dim sm:flex-row sm:items-center sm:justify-between">
           <p>
-            PlanProof never runs <code className="font-mono">terraform apply</code>{" "}
-            in the MVP. Apply is out of scope.
+            PlanProof never runs the infrastructure-changing apply command in the
+            MVP. Applying changes is out of scope.
           </p>
           <p>
             Check results are evidence, not a security guarantee. Approval is bound

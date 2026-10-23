@@ -1,25 +1,45 @@
 "use client";
 
 import { useState } from "react";
-import type { ApprovalRecord } from "@/lib/api";
-import type { PlanSummary } from "@/lib/contracts";
+import type { ApprovalRecord, PlanCapture } from "@/lib/api";
+import type { PlanSummary, TaskState } from "@/lib/contracts";
 import { formatTimestamp } from "@/lib/ui";
+import { DIGEST_PATTERN } from "@/lib/validate";
 import { Banner } from "./Panel";
 
 export function ApprovalPanel({
+  state,
+  approvalValid,
   planSummary,
   approval,
+  capture,
+  unavailableReason,
   onApprove,
 }: {
+  state: TaskState;
+  approvalValid?: boolean | null;
   planSummary: PlanSummary | null;
   approval: ApprovalRecord | null;
+  capture?: PlanCapture | null;
+  unavailableReason?: string | null;
   onApprove: (planDigest: string) => Promise<void>;
 }) {
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const digest = planSummary?.plan_digest ?? "";
-  const canApprove = digest.length > 0 && !approving && !approval;
+  const digest = planSummary?.plan_digest ?? capture?.plan_digest ?? "";
+  const digestValid = DIGEST_PATTERN.test(digest);
+  const blocked = Boolean(unavailableReason);
+  const awaitingApproval = state === "AWAITING_APPROVAL";
+  const approvalValidOk = approvalValid !== false;
+  const canApprove =
+    Boolean(planSummary) &&
+    digestValid &&
+    awaitingApproval &&
+    approvalValidOk &&
+    !blocked &&
+    !approving &&
+    !approval;
 
   async function handleApprove() {
     setError(null);
@@ -75,11 +95,19 @@ export function ApprovalPanel({
 
   return (
     <div className="flex flex-col gap-4" data-testid="approval-panel">
+      {blocked ? (
+        <Banner tone="warning" title="Approval endpoint unavailable" testId="approval-unavailable">
+          <p>{unavailableReason}</p>
+        </Banner>
+      ) : null}
+
       {!digest ? (
         <Banner tone="warning" title="Plan digest missing" testId="missing-digest">
           <p>
-            No plan has been captured for this task. Approval stays disabled until a
-            plan digest exists.
+            {capture && capture.available === false
+              ? capture.reason ??
+                "No plan was captured for this task. Approval stays disabled until a plan digest exists."
+              : "No plan has been captured for this task. Approval stays disabled until a plan digest exists."}
           </p>
         </Banner>
       ) : (
@@ -99,6 +127,16 @@ export function ApprovalPanel({
           </p>
         </div>
       )}
+
+      {digest && !planSummary ? (
+        <Banner tone="warning" title="Plan captured but not classified" testId="unclassified-digest">
+          <p>
+            A digest exists, but no classified plan summary (counts, destructive
+            actions) is available. Approval stays disabled until classification is
+            provided.
+          </p>
+        </Banner>
+      ) : null}
 
       {planSummary && planSummary.destructive_actions.length > 0 ? (
         <Banner tone="danger" title="Review destructive actions first">
@@ -129,9 +167,19 @@ export function ApprovalPanel({
           {approving ? "Recording approval…" : "Approve this plan"}
         </button>
         <p className="text-xs text-ink-dim">
-          {!digest
-            ? "Enable approval by capturing a plan first."
-            : "Approving records consent for this exact plan only. It does not apply infrastructure."}
+          {blocked
+            ? "Approval is unavailable until the approval endpoint exists."
+            : !digest
+              ? "Enable approval by capturing a plan first."
+              : !planSummary
+                ? "Enable approval once the plan summary is classified."
+                : !digestValid
+                  ? "The plan digest is not a valid sha256 value, so approval stays disabled."
+                  : !awaitingApproval
+                    ? "Approval only opens when the task state is awaiting approval."
+                    : !approvalValidOk
+                      ? "The server marked this task's approval as invalid, so approval stays disabled."
+                      : "Approving records consent for this exact plan only. It does not apply infrastructure."}
         </p>
       </div>
     </div>

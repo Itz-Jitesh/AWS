@@ -4,17 +4,87 @@ import { describe, expect, it, vi } from "vitest";
 import { ApprovalPanel } from "@/components/ApprovalPanel";
 import { DEMO_PLAN_DIGEST, demoWorkspace } from "@/lib/fixtures";
 
+const AWAITING = demoWorkspace.task.state;
+
 describe("ApprovalPanel", () => {
   it("disables approval when the plan digest is missing", () => {
     const onApprove = vi.fn();
 
     render(
-      <ApprovalPanel planSummary={null} approval={null} onApprove={onApprove} />,
+      <ApprovalPanel
+        state={AWAITING}
+        planSummary={null}
+        approval={null}
+        onApprove={onApprove}
+      />,
     );
 
     expect(screen.getByTestId("missing-digest")).toBeInTheDocument();
     expect(screen.getByTestId("approve-button")).toBeDisabled();
     expect(screen.queryByTestId("approval-digest")).not.toBeInTheDocument();
+  });
+
+  it("disables approval when the plan digest is malformed", () => {
+    const onApprove = vi.fn();
+    const malformed = {
+      ...demoWorkspace.plan_summary!,
+      plan_digest: "not-a-sha256",
+    };
+
+    render(
+      <ApprovalPanel
+        state={AWAITING}
+        planSummary={malformed}
+        approval={null}
+        onApprove={onApprove}
+      />,
+    );
+
+    expect(screen.getByTestId("approve-button")).toBeDisabled();
+    expect(screen.getByTestId("approval-digest")).toHaveTextContent(
+      "not-a-sha256",
+    );
+    expect(screen.getByText(/not a valid sha256/i)).toBeInTheDocument();
+    expect(onApprove).not.toHaveBeenCalled();
+  });
+
+  it("disables approval when the task state is not awaiting approval", () => {
+    const onApprove = vi.fn();
+
+    render(
+      <ApprovalPanel
+        state="REVIEW_READY"
+        planSummary={demoWorkspace.plan_summary}
+        approval={null}
+        onApprove={onApprove}
+      />,
+    );
+
+    expect(screen.getByTestId("approve-button")).toBeDisabled();
+    expect(
+      screen.getByText(/only opens when the task state is awaiting approval/i),
+    ).toBeInTheDocument();
+    expect(onApprove).not.toHaveBeenCalled();
+  });
+
+  it("disables approval when the server marks approval_valid as false", () => {
+    const onApprove = vi.fn();
+
+    render(
+      <ApprovalPanel
+        state={AWAITING}
+        approvalValid={false}
+        planSummary={demoWorkspace.plan_summary}
+        approval={null}
+        onApprove={onApprove}
+      />,
+    );
+
+    expect(screen.getByTestId("approve-button")).toBeDisabled();
+    expect(
+      screen.getByText(/server marked this task's approval as invalid/i),
+    ).toBeInTheDocument();
+    expect(onApprove).not.toHaveBeenCalled();
   });
 
   it("shows the digest and approves exactly that value", async () => {
@@ -23,6 +93,7 @@ describe("ApprovalPanel", () => {
 
     render(
       <ApprovalPanel
+        state={AWAITING}
         planSummary={demoWorkspace.plan_summary}
         approval={null}
         onApprove={onApprove}
@@ -49,6 +120,7 @@ describe("ApprovalPanel", () => {
 
     render(
       <ApprovalPanel
+        state={AWAITING}
         planSummary={demoWorkspace.plan_summary}
         approval={null}
         onApprove={onApprove}
@@ -67,6 +139,7 @@ describe("ApprovalPanel", () => {
   it("lists destructive actions before consent", () => {
     render(
       <ApprovalPanel
+        state={AWAITING}
         planSummary={demoWorkspace.plan_summary}
         approval={null}
         onApprove={vi.fn()}
@@ -80,6 +153,7 @@ describe("ApprovalPanel", () => {
   it("shows a recorded approval and hides the approve button", () => {
     render(
       <ApprovalPanel
+        state={AWAITING}
         planSummary={demoWorkspace.plan_summary}
         approval={{
           approved_plan_digest: DEMO_PLAN_DIGEST,

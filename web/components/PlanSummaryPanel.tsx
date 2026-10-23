@@ -1,7 +1,8 @@
 "use client";
 
+import type { PlanCapture } from "@/lib/api";
 import type { PlanSummary } from "@/lib/contracts";
-import { shortDigest } from "@/lib/ui";
+import { formatTimestamp, shortDigest } from "@/lib/ui";
 import { Banner, EmptyState } from "./Panel";
 import { RiskBadge } from "./badges";
 
@@ -27,16 +28,68 @@ function tileClass(key: CountTile["key"], value: number): string {
 
 export function PlanSummaryPanel({
   planSummary,
+  capture,
+  onCapture,
+  capturing = false,
+  unavailableReason,
 }: {
   planSummary: PlanSummary | null;
+  capture?: PlanCapture | null;
+  onCapture?: (() => Promise<void>) | undefined;
+  capturing?: boolean;
+  unavailableReason?: string | undefined;
 }) {
   if (!planSummary) {
     return (
-      <div data-testid="plan-summary">
+      <div className="flex flex-col gap-3" data-testid="plan-summary">
         <EmptyState
-          message="No plan captured yet."
-          hint="The plan digest is required before approval can be enabled."
+          message="No plan summary yet."
+          hint={
+            unavailableReason ??
+            "Run the check suite first; the plan digest is required before approval can be enabled."
+          }
         />
+
+        {capture?.available && capture.plan_digest ? (
+          <div className="rounded-lg border border-line bg-surface px-4 py-3">
+            <p className="text-[11px] font-semibold tracking-wide text-ink-dim uppercase">
+              Captured plan digest (sha256)
+            </p>
+            <p
+              data-testid="capture-digest"
+              className="mt-1 font-mono text-xs break-all text-ink-muted"
+              title={capture.plan_digest}
+            >
+              {capture.plan_digest}
+            </p>
+            <p className="mt-1.5 font-mono text-[11px] text-ink-dim">
+              {shortDigest(capture.plan_digest)}
+              {capture.captured_at ? ` · captured ${formatTimestamp(capture.captured_at)}` : ""}
+            </p>
+            <p className="mt-1.5 text-xs text-amber-300">
+              Classification unavailable: change counts and destructive actions are
+              unknown, so approval stays disabled.
+            </p>
+          </div>
+        ) : null}
+
+        {capture && capture.available === false ? (
+          <p className="text-xs text-ink-dim" data-testid="capture-unavailable">
+            {capture.reason ?? "No plan was captured for this task."}
+          </p>
+        ) : null}
+
+        {onCapture ? (
+          <button
+            type="button"
+            data-testid="capture-plan"
+            onClick={() => void onCapture()}
+            disabled={capturing}
+            className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {capturing ? "Capturing plan…" : "Capture plan digest"}
+          </button>
+        ) : null}
       </div>
     );
   }

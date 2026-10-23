@@ -82,10 +82,12 @@ export function FindingsList({
   findings,
   baseline,
   emptyMessage = "No findings recorded for this task yet.",
+  unavailableReason,
 }: {
   findings: Finding[];
   baseline?: Finding[];
   emptyMessage?: string;
+  unavailableReason?: string;
 }) {
   const [view, setView] = useState<"current" | "baseline">("current");
   const hasBaseline = Boolean(baseline && baseline.length > 0);
@@ -153,8 +155,8 @@ export function FindingsList({
 
       {sorted.length === 0 ? (
         <EmptyState
-          message={emptyMessage}
-          hint="Findings appear after the check suite runs."
+          message={unavailableReason ? "Findings are unavailable in this mode." : emptyMessage}
+          hint={unavailableReason ?? "Findings appear after the check suite runs."}
         />
       ) : (
         <div className="flex flex-col gap-2.5">

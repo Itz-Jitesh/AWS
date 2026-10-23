@@ -33,7 +33,7 @@ describe("PlanSummaryPanel", () => {
   it("explains that a missing plan blocks approval", () => {
     render(<PlanSummaryPanel planSummary={null} />);
 
-    expect(screen.getByText("No plan captured yet.")).toBeInTheDocument();
+    expect(screen.getByText("No plan summary yet.")).toBeInTheDocument();
     expect(
       screen.getByText(/digest is required before approval/i),
     ).toBeInTheDocument();

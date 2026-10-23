@@ -1,48 +1,40 @@
 import {
   ApiError,
   type ApprovalResponse,
+  type BackendId,
   type CheckSuiteResponse,
   type CreateTaskInput,
   type EvidenceReport,
   type PatchResponse,
   type PlanProofApi,
+  type SupportMap,
   type TaskRecord,
   type TaskWorkspace,
 } from "./api";
+import { requestJson } from "./http";
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(path, {
-      ...init,
-      headers: {
-        "content-type": "application/json",
-        ...(init?.headers ?? {}),
-      },
-    });
-  } catch {
-    throw new ApiError("network", `Request to ${path} failed to reach the server.`);
-  }
+export const ORCHESTRATION_BACKEND: BackendId = "orchestration";
 
-  if (response.status === 404) {
-    throw new ApiError("not_found", `No resource at ${path}.`);
-  }
+export const ORCHESTRATION_SUPPORT: SupportMap = {
+  createTask: "unverified",
+  getWorkspace: "unverified",
+  runCheckSuite: "unverified",
+  findings: "unverified",
+  extractRequirements: "unavailable",
+  generatePatch: "unverified",
+  planSummary: "unverified",
+  capturePlan: "unavailable",
+  approveTask: "unverified",
+  getEvidenceReport: "unverified",
+};
 
-  if (!response.ok) {
-    throw new ApiError(
-      "network",
-      `Request to ${path} returned HTTP ${response.status}.`,
-    );
-  }
-
-  try {
-    return (await response.json()) as T;
-  } catch {
-    throw new ApiError("invalid_response", `Response from ${path} was not JSON.`);
-  }
-}
+const ORCHESTRATION_NOTE =
+  "Proposed orchestration endpoint (E proposals, DEC-03/DEC-07). No service implements it yet — owner Agent B.";
 
 export class HttpApiClient implements PlanProofApi {
+  readonly backend = ORCHESTRATION_BACKEND;
+  readonly support = ORCHESTRATION_SUPPORT;
+
   constructor(private readonly baseUrl: string) {}
 
   private url(path: string): string {
@@ -50,9 +42,13 @@ export class HttpApiClient implements PlanProofApi {
   }
 
   createTask(input: CreateTaskInput): Promise<TaskRecord> {
+    const repoSource =
+      input.repo_source.kind === "zip"
+        ? { kind: "zip" as const, filename: input.repo_source.filename }
+        : { kind: "git_url" as const, url: input.repo_source.url };
     return requestJson<TaskRecord>(this.url("/tasks"), {
       method: "POST",
-      body: JSON.stringify(input),
+      body: { repo_source: repoSource, goal: input.goal, mode: input.mode },
     });
   }
 
@@ -77,10 +73,7 @@ export class HttpApiClient implements PlanProofApi {
   approveTask(taskId: string, planDigest: string): Promise<ApprovalResponse> {
     return requestJson<ApprovalResponse>(
       this.url(`/tasks/${encodeURIComponent(taskId)}/approve`),
-      {
-        method: "POST",
-        body: JSON.stringify({ plan_digest: planDigest }),
-      },
+      { method: "POST", body: { plan_digest: planDigest } },
     );
   }
 
@@ -89,4 +82,28 @@ export class HttpApiClient implements PlanProofApi {
       this.url(`/tasks/${encodeURIComponent(taskId)}/report`),
     );
   }
+
+  operationNotes() {
+    return {
+      createTask: { level: "unverified" as const, detail: ORCHESTRATION_NOTE },
+      getWorkspace: { level: "unverified" as const, detail: ORCHESTRATION_NOTE },
+      runCheckSuite: { level: "unverified" as const, detail: ORCHESTRATION_NOTE },
+      generatePatch: { level: "unverified" as const, detail: ORCHESTRATION_NOTE },
+      approveTask: { level: "unverified" as const, detail: ORCHESTRATION_NOTE },
+      getEvidenceReport: { level: "unverified" as const, detail: ORCHESTRATION_NOTE },
+      extractRequirements: {
+        level: "unavailable" as const,
+        detail:
+          "No standalone requirements endpoint exists on the orchestration contract; requirements arrive in the task read model.",
+      },
+      capturePlan: {
+        level: "unavailable" as const,
+        detail: "Plan capture classification is not part of the proposed orchestration surface yet.",
+      },
+    };
+  }
+}
+
+export function isUnsupported(error: unknown): boolean {
+  return error instanceof ApiError && error.kind === "not_supported";
 }

@@ -37,7 +37,7 @@ describe("TaskWorkspace", () => {
 
     expect(screen.queryByText(/secure/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /terraform apply/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
   });
 
   it("approves the exact plan digest", async () => {

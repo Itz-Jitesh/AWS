@@ -5,13 +5,22 @@ import { shortDigest } from "@/lib/ui";
 import { DiffViewer } from "./DiffViewer";
 import { EmptyState } from "./Panel";
 
-export function PatchPanel({ patch }: { patch: Patch | null }) {
+export function PatchPanel({
+  patch,
+  unavailableReason,
+}: {
+  patch: Patch | null;
+  unavailableReason?: string;
+}) {
   if (!patch) {
     return (
       <div data-testid="patch-panel">
         <EmptyState
           message="No patch proposed yet."
-          hint="Generate a patch to see the minimal unified diff for this goal."
+          hint={
+            unavailableReason ??
+            "Generate a patch to see the minimal unified diff for this goal."
+          }
         />
       </div>
     );

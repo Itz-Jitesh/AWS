@@ -118,6 +118,8 @@ const TASK_STATE_LABELS: Record<TaskState, string> = {
   REPAIRING: "Repairing",
   REVIEW_READY: "Review ready",
   AWAITING_APPROVAL: "Awaiting approval",
+  APPLYING: "Applying",
+  POST_DEPLOY_CHECKS: "Post-deploy checks",
   COMPLETE: "Complete",
 };
 
@@ -134,6 +136,8 @@ const TASK_STATE_TONES: Record<TaskState, string> = {
   REPAIRING: "border-amber-700/60 bg-amber-950/60 text-amber-300",
   REVIEW_READY: "border-indigo-600/60 bg-indigo-950 text-indigo-300",
   AWAITING_APPROVAL: "border-indigo-600/60 bg-indigo-950 text-indigo-300",
+  APPLYING: "border-red-700/60 bg-red-950/70 text-red-300",
+  POST_DEPLOY_CHECKS: "border-amber-700/60 bg-amber-950/60 text-amber-300",
   COMPLETE: "border-emerald-700/60 bg-emerald-950/70 text-emerald-300",
 };
 

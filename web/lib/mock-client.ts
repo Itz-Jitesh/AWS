@@ -4,8 +4,11 @@ import {
   type CheckSuiteResponse,
   type CreateTaskInput,
   type EvidenceReport,
+  type Operation,
+  type OperationNote,
   type PatchResponse,
   type PlanProofApi,
+  type SupportMap,
   type TaskRecord,
   type TaskWorkspace,
 } from "./api";
@@ -30,11 +33,29 @@ function sleep(ms: number): Promise<void> {
 }
 
 export class MockApiClient implements PlanProofApi {
+  readonly backend = "mock" as const;
+  readonly support: SupportMap = {
+    createTask: "available",
+    getWorkspace: "available",
+    runCheckSuite: "available",
+    findings: "available",
+    extractRequirements: "available",
+    generatePatch: "available",
+    planSummary: "available",
+    capturePlan: "available",
+    approveTask: "available",
+    getEvidenceReport: "available",
+  };
+
   private readonly tasks = new Map<string, TaskWorkspace>();
   private sequence = 0;
 
   constructor() {
     this.tasks.set(DEMO_TASK_ID, clone(demoWorkspace));
+  }
+
+  operationNotes(): Partial<Record<Operation, OperationNote>> {
+    return {};
   }
 
   async createTask(input: CreateTaskInput): Promise<TaskRecord> {

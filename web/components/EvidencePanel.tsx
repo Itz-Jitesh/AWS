@@ -22,11 +22,15 @@ export function EvidencePanel({
   taskId,
   limitations,
   toolVersions,
+  reportSupported = true,
+  unavailableReason,
   onDownload,
 }: {
   taskId: string;
   limitations: string[];
   toolVersions: Record<string, string | null>;
+  reportSupported?: boolean;
+  unavailableReason?: string;
   onDownload: () => Promise<EvidenceReport>;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -103,15 +107,21 @@ export function EvidencePanel({
           The report records statuses, evidence, versions, the plan digest and
           limitations. It is not a security guarantee.
         </p>
-        <button
-          type="button"
-          data-testid="download-report"
-          onClick={handleDownload}
-          disabled={pending}
-          className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pending ? "Preparing report…" : "Download evidence report"}
-        </button>
+        {reportSupported ? (
+          <button
+            type="button"
+            data-testid="download-report"
+            onClick={handleDownload}
+            disabled={pending}
+            className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pending ? "Preparing report…" : "Download evidence report"}
+          </button>
+        ) : (
+          <p className="text-xs text-amber-300" data-testid="report-unavailable">
+            {unavailableReason ?? "The evidence report endpoint is unavailable."}
+          </p>
+        )}
       </div>
     </div>
   );
