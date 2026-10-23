@@ -7,6 +7,7 @@ import zipfile
 from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 from . import checks as check_pipeline
 from .artifacts import load_plan, redacted_plan_view, store_plan
@@ -57,6 +58,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     resolved = settings or load_settings()
     resolved.ensure_dirs()
     app = FastAPI(title="PlanProof Worker", version=SERVICE_VERSION)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(resolved.cors_allow_origins),
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
+        allow_credentials=False,
+        max_age=600,
+    )
     app.state.settings = resolved
     app.state.store = TaskStore(resolved)
     app.state.version_cache: dict[str, str | None] = {}

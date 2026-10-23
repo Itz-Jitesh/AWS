@@ -39,10 +39,29 @@ class Settings:
     max_output_read_bytes: int = 1_000_000
     max_output_file_bytes: int = 32 * 1024 * 1024
     git_enabled: bool = True
+    cors_allow_origins: tuple[str, ...] = (
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    )
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         os.chmod(self.data_dir, 0o700)
+
+
+def _env_origins(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    origins: list[str] = []
+    for item in raw.split(","):
+        origin = item.strip().rstrip("/")
+        if not origin:
+            continue
+        if origin == "*":
+            continue
+        origins.append(origin)
+    return tuple(origins)
 
 
 def load_settings() -> Settings:
@@ -62,4 +81,8 @@ def load_settings() -> Settings:
         max_output_read_bytes=_env_int("WORKER_MAX_OUTPUT_READ_BYTES", 1_000_000),
         max_output_file_bytes=_env_int("WORKER_MAX_OUTPUT_FILE_BYTES", 32 * 1024 * 1024),
         git_enabled=_env_bool("WORKER_GIT_ENABLED", True),
+        cors_allow_origins=_env_origins(
+            "WORKER_CORS_ALLOW_ORIGINS",
+            ("http://localhost:3000", "http://127.0.0.1:3000"),
+        ),
     )

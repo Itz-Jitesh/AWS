@@ -36,6 +36,32 @@ curl localhost:8081/capabilities
 `GET /capabilities` reports detected tool binaries/versions, per-check availability
 and argv previews, the sandbox mode, configured limits, and `apply_enabled: false`.
 
+## CORS (browser access)
+
+The worker sends CORS headers so browsers on the configured frontend origin(s) can
+call it directly (orchestration mode `NEXT_PUBLIC_API_BASE_URL`).
+
+| Setting | Value |
+|---|---|
+| Env var | `WORKER_CORS_ALLOW_ORIGINS` (comma-separated, trailing slashes stripped) |
+| Default origins | `http://localhost:3000`, `http://127.0.0.1:3000` |
+| Methods | `GET`, `POST`, `OPTIONS` |
+| Request headers | `Content-Type`, `Authorization` |
+| Credentials | not enabled (`allow_credentials=false`); no wildcard ever emitted — a `*` entry in the env var is ignored |
+| Preflight | handled by middleware for any path (including missing routes) with `Access-Control-Max-Age: 600` — preflights never 404/405 |
+| Error responses | 4xx/5xx carry `Access-Control-Allow-Origin` for approved origins |
+| Unapproved origin | no `Access-Control-Allow-Origin` → browser blocks the response (verified in Chromium) |
+
+Alternative path (no CORS needed): the Next.js same-origin proxy
+(`/service/worker/:path*` rewrites in `web/next.config.ts`, targets
+`PLANPROOF_WORKER_URL` / `NEXT_PUBLIC_WORKER_URL`) — browser talks only to the
+frontend origin; the proxy forwards server-side. Direct mode (`/service/worker`)
+is verified working; direct cross-origin mode (`NEXT_PUBLIC_API_BASE_URL`) is
+verified with the CORS rules above.
+
+The worker never emits `Access-Control-Allow-Origin: *` and does not enable
+credentials, so credentialed CORS with wildcards is impossible by construction.
+
 ## Configuration (environment variables)
 
 | Variable | Default | Meaning |
