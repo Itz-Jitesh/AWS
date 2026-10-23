@@ -1,0 +1,8 @@
+diff --git a/s3.tf b/s3.tf
+--- a/s3.tf
++++ b/s3.tf
+@@ -1,7 +1,1 @@
+-resource "aws_s3_bucket" "public_data" {
+-  bucket = "demo-public-data"
+-  acl    = "public-read"
+-}

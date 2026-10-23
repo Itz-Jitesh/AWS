@@ -16,3 +16,9 @@ build/
 .terraform/
 plan-artifacts/
 workspace-data/
+
+# Local runtime data
+data/
+*.tmp
+.DS_Store
+*.egg-info/
