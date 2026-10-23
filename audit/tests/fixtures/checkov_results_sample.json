@@ -1,0 +1,65 @@
+{
+  "results": {
+    "passed_checks": [
+      {
+        "check_id": "CKV_AWS_18",
+        "check_name": "Ensure the S3 bucket has access logging enabled",
+        "short_description": "S3 access logging disabled",
+        "resource": "aws_s3_bucket.logs",
+        "file_path": "main.tf",
+        "file_line_range": [3, 9],
+        "severity": "HIGH"
+      },
+      {
+        "check_id": "CKV_AWS_999",
+        "check_name": "Custom informational check",
+        "short_description": "Weird severity tolerated",
+        "resource": "aws_s3_bucket.logs",
+        "file_path": "main.tf",
+        "file_line_range": [3, 9],
+        "severity": "BANANA"
+      }
+    ],
+    "failed_checks": [
+      {
+        "check_id": "CKV_AWS_20",
+        "check_name": "Ensure the S3 bucket does not allow read ACL to all users",
+        "short_description": "S3 bucket ACL allows public READ",
+        "resource": "aws_s3_bucket.public_data",
+        "file_path": "s3.tf",
+        "file_line_range": [1, 14],
+        "severity": "CRITICAL",
+        "guideline": "https://docs.bridgecrew.io/docs/s3_18-public-read-access"
+      },
+      {
+        "check_id": "CKV_AWS_18",
+        "check_name": "Ensure the S3 bucket has access logging enabled",
+        "short_description": "S3 access logging disabled",
+        "resource": "aws_s3_bucket.public_data",
+        "file_path": "s3.tf",
+        "file_line_range": [1, 14],
+        "severity": "MEDIUM"
+      }
+    ],
+    "skipped_checks": [
+      {
+        "check_id": "CKV_AWS_52",
+        "check_name": "Ensure MFA is enabled for root account",
+        "short_description": "MFA not enabled for root account",
+        "resource": "aws_iam_user.operator",
+        "file_path": "iam.tf",
+        "file_line_range": [1, 5],
+        "skip_data": {
+          "comment": "root account not managed in this repository"
+        }
+      }
+    ]
+  },
+  "summary": {
+    "checks_executed": 5,
+    "checks_passed": 2,
+    "checks_failed": 2,
+    "checks_skipped": 1,
+    "resource_scanned": 3
+  }
+}

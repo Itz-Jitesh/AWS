@@ -59,6 +59,18 @@ def resolve_executable(name: str, env_var: str) -> tuple[str | None, str]:
     return None, f"{name} executable not found on PATH"
 
 
+def resolve_scanner(
+    executable: str | None, name: str, env_var: str
+) -> tuple[str | None, str]:
+    """Like :func:`resolve_executable`, but an explicit override wins first."""
+    if executable:
+        candidate = Path(executable)
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(executable), f"explicit executable {executable}"
+        return None, f"explicit executable {executable} does not exist or is not executable"
+    return resolve_executable(name, env_var)
+
+
 def run_argv(
     argv: Sequence[str],
     *,
