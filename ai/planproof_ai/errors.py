@@ -14,6 +14,22 @@ class LLMResponseError(PlanProofAIError):
     code = "llm_response_invalid"
 
 
+class LLMAuthError(LLMUnavailableError):
+    code = "llm_auth_error"
+
+
+class LLMThrottledError(LLMUnavailableError):
+    code = "llm_throttled"
+
+
+class LLMEndpointError(LLMUnavailableError):
+    code = "llm_endpoint_error"
+
+
+class LLMTimeoutError(LLMUnavailableError):
+    code = "llm_timeout"
+
+
 class WorkerError(PlanProofAIError):
     code = "worker_error"
 

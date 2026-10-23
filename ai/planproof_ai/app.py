@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Path
 from pydantic import BaseModel, ConfigDict, Field
 
-from .clients import AuditClient, WorkerClient
+from .clients import AuditClient, HttpAuditClient, HttpWorkerClient, WorkerClient
 from .config import AIConfig
 from .contracts import Patch, Requirement
 from .errors import (
@@ -14,7 +14,9 @@ from .errors import (
 from .extract import extract_requirements
 from .generate import generate_patch
 from .llm.base import LLMAdapter
-from .llm.factory import create_adapter
+from .llm.factory import create_adapter, resolve_backend
+from .llm.ollama import OllamaAdapter
+from .llm.sagemaker import SageMakerAdapter
 from .repair import RepairResult, repair_loop
 from .testing import MockAuditClient, MockWorkerClient
 
@@ -61,6 +63,36 @@ class HealthResponse(BaseModel):
     model_id: str
 
 
+class ModelCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    backend: str
+    adapter: str
+    model_id: str
+    model_mode: str
+    payload_mode: str | None = None
+    endpoint_name: str | None = None
+    endpoint_configured: bool
+    requires_live_endpoint: bool
+
+
+class ServiceCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str
+    base_url: str | None = None
+
+
+class CapabilitiesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    model: ModelCapability
+    worker: ServiceCapability
+    audit: ServiceCapability
+    repair_max_attempts: int
+
+
 def _resolve_requirements(
     goal: str | None, requirements: list[Requirement] | None, llm: LLMAdapter, config: AIConfig
 ) -> list[Requirement]:
@@ -80,8 +112,16 @@ def create_app(
 ) -> FastAPI:
     config = config or AIConfig.from_env()
     llm = llm or create_adapter(config)
-    worker = worker or MockWorkerClient()
-    audit = audit or MockAuditClient()
+    worker = worker or (
+        HttpWorkerClient(config.worker_base_url)
+        if config.worker_base_url
+        else MockWorkerClient()
+    )
+    audit = audit or (
+        HttpAuditClient(config.audit_base_url)
+        if config.audit_base_url
+        else MockAuditClient()
+    )
 
     app = FastAPI(title="PlanProof AI Service (Agent C)", version="0.1.0")
     app.state.llm = llm
@@ -92,7 +132,46 @@ def create_app(
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse(
-            status="ok", model_backend=config.model_backend, model_id=llm.model_id
+            status="ok", model_backend=resolve_backend(config), model_id=llm.model_id
+        )
+
+    @app.get("/capabilities", response_model=CapabilitiesResponse)
+    def capabilities() -> CapabilitiesResponse:
+        backend = resolve_backend(config)
+        live = backend != "mock"
+        if isinstance(llm, SageMakerAdapter):
+            endpoint_name = llm.endpoint_name or None
+            endpoint_configured = llm.endpoint_configured
+            payload_mode: str | None = llm.payload_mode
+        elif isinstance(llm, OllamaAdapter):
+            endpoint_name = llm.base_url
+            endpoint_configured = True
+            payload_mode = None
+        else:
+            endpoint_name = None
+            endpoint_configured = False
+            payload_mode = None
+        return CapabilitiesResponse(
+            status="ok",
+            model=ModelCapability(
+                backend=backend,
+                adapter=type(llm).__name__,
+                model_id=llm.model_id,
+                model_mode=config.model_mode,
+                payload_mode=payload_mode,
+                endpoint_name=endpoint_name,
+                endpoint_configured=endpoint_configured,
+                requires_live_endpoint=live,
+            ),
+            worker=ServiceCapability(
+                mode="http" if isinstance(worker, HttpWorkerClient) else "mock",
+                base_url=config.worker_base_url or None,
+            ),
+            audit=ServiceCapability(
+                mode="http" if isinstance(audit, HttpAuditClient) else "mock",
+                base_url=config.audit_base_url or None,
+            ),
+            repair_max_attempts=config.max_repair_attempts,
         )
 
     @app.post(
@@ -126,8 +205,10 @@ def create_app(
             raise _http(400, exc, code="bad_request") from exc
         except PatchValidationError as exc:
             raise _http(422, exc) from exc
-        except (LLMUnavailableError, LLMResponseError) as exc:
+        except LLMUnavailableError as exc:
             raise _http(503, exc) from exc
+        except LLMResponseError as exc:
+            raise _http(502, exc) from exc
         return PatchResponse(patch=patch)
 
     @app.post(

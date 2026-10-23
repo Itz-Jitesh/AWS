@@ -18,6 +18,12 @@ test = [
     "pytest>=8",
     "jsonschema>=4.21",
 ]
+aws = [
+    "boto3>=1.34",
+]
+serve = [
+    "uvicorn>=0.29",
+]
 
 [tool.setuptools.packages.find]
 include = ["planproof_ai*"]
@@ -25,3 +31,6 @@ include = ["planproof_ai*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "tests"]
+markers = [
+    "live: requires a real SageMaker endpoint and AWS credentials (set PLANPROOF_RUN_LIVE=1 and SAGEMAKER_ENDPOINT_NAME)",
+]

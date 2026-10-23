@@ -12,15 +12,18 @@ ai/
     config.py        AIConfig / PatchLimits (env-driven)
     errors.py        Typed error hierarchy with stable error codes
     redaction.py     Secret redaction for prompts/diagnostics
-    llm/             LLMAdapter, MockLLMAdapter, OllamaAdapter, SageMakerAdapter
+    llm/             LLMAdapter, MockLLMAdapter, OllamaAdapter, SageMakerAdapter (real boto3 path)
     extract.py       extract_requirements(goal) -> Requirement[]
     patching.py      diff parse / validate / apply + workspace digest
     generate.py      generate_patch(workspace, requirements, diagnostics) -> Patch
     repair.py        repair_loop(task_id, workspace, ...) -> RepairResult
     clients.py       WorkerClient / AuditClient protocols + HTTP wrappers
     testing.py       MockWorkerClient, MockAuditClient, fixture builders
-    app.py           FastAPI app factory + typed request/response models
-  tests/             pytest suite (no network, no live model, no terraform)
+    app.py           FastAPI app factory (/health, /capabilities, /tasks/...)
+  deploy/            guarded SageMaker endpoint lifecycle (cost-authorized)
+  tests/             pytest suite (no network, no terraform; live tests skip-gated)
+  .env.example       configuration reference
+  SAGEMAKER_*.md     integration, deployment plan, test results
   README.md          This file: interface contract for Agent C
 ```
 
@@ -72,7 +75,8 @@ Tests use `testing.MockAuditClient`.
 | `POST /tasks/{id}/requirements` | `{"goal": "..."}` | `{"requirements": [Requirement, ...]}` |
 | `POST /tasks/{id}/patch` | `{"workspace", "goal"?, "requirements"?, "diagnostics"?}` | `{"patch": Patch}` or `422 {"code", "message"}` |
 | `POST /tasks/{id}/repair` | `{"workspace", "goal"?, "requirements"?, "max_attempts" ≤ 3}` | `{"result": RepairResult}` — **provisional** orchestration endpoint |
-| `GET /health` | — | `{"status": "ok", "model_backend": ...}` |
+| `GET /health` | — | `{"status": "ok", "model_backend": <resolved>, ...}` |
+| `GET /capabilities` | — | model backend/adapter/endpoint_configured/payload_mode + worker/audit `mock|http` modes (no secrets) |
 
 ### AI → LLM (TRD §2)
 
@@ -80,8 +84,34 @@ Tests use `testing.MockAuditClient`.
 - `LLMResponse {patch, rationale, model_id, finish_reason}`
 
 Adapters: `MockLLMAdapter` (tests/demo), `OllamaAdapter` (local, optional),
-`SageMakerAdapter` (interface only; raises `ModelNotConfigured` until a hosted
-endpoint passes the TRD §2 validation gate — no AWS resources are created here).
+`SageMakerAdapter` (**real SageMaker Runtime path**: boto3 `invoke_endpoint`,
+payload modes `planproof|hf|openai`, typed auth/timeout/throttle/endpoint
+errors with redacted messages, fail-closed when unconfigured — **no silent
+mock fallback**). Live inference requires a deployed endpoint; see
+[SAGEMAKER_DEPLOYMENT_PLAN.md](SAGEMAKER_DEPLOYMENT_PLAN.md).
+
+Run the service:
+
+```bash
+pip install -r requirements.txt        # + pip install -e '.[aws]' for boto3
+.venv/bin/python -m uvicorn planproof_ai.app:app --port 8080
+```
+
+Configuration reference: [.env.example](.env.example). Key variables:
+`MODEL_BACKEND` (empty = auto: endpoint implies `sagemaker`, else `mock`;
+unknown value fails closed), `SAGEMAKER_ENDPOINT_NAME`, `SAGEMAKER_REGION`,
+`SAGEMAKER_PAYLOAD_MODE`, `SAGEMAKER_TIMEOUT_S`, `MODEL_ID`,
+`MODEL_MODE`, `WORKER_BASE_URL`, `AUDIT_BASE_URL`.
+
+## SageMaker / Gemma 4 docs
+
+- [SAGEMAKER_GEMMA_INTEGRATION.md](SAGEMAKER_GEMMA_INTEGRATION.md) — adapter,
+  capabilities, artifact status (base model = Strategy A), C→B mismatches.
+- [SAGEMAKER_DEPLOYMENT_PLAN.md](SAGEMAKER_DEPLOYMENT_PLAN.md) — exact LMI
+  image / vLLM version / instance / schemas, verification gates, costs,
+  authorization gates, teardown.
+- [SAGEMAKER_INTEGRATION_TEST_RESULTS.md](SAGEMAKER_INTEGRATION_TEST_RESULTS.md)
+  — commands, results, mock-vs-live classification, milestone report.
 
 ## Design decisions
 
@@ -111,3 +141,10 @@ Transformers/LoRA support for that checkpoint, chosen SageMaker container
 (LoRA vs merged), instance type memory, request/response schema parity with
 `LLMResponse`, then delete any temporary endpoint. Do not assume Gemma 4 E4B
 supports a given LoRA serving configuration.
+
+The validation gate text lives in `llm/sagemaker.py::VALIDATION_GATE` and is
+raised as `ModelNotConfiguredError` whenever real inference is attempted
+without a configured endpoint/boto3. The fine-tuned LoRA artifact is currently
+unavailable in this repository (colab notebook is a placeholder); the
+integration therefore targets the **base** `google/gemma-4-E4B-it` with
+`MODEL_MODE=merged`, subject to later evaluation.
