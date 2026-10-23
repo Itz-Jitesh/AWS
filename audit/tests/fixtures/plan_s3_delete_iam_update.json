@@ -1,0 +1,68 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.public_data",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "public_data",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "bucket": "demo-public-data",
+          "acl": "public-read",
+          "secret_access_key": "REDACTED-FIXTURE-VALUE"
+        },
+        "after": null,
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_iam_policy.wide",
+      "mode": "managed",
+      "type": "aws_iam_policy",
+      "name": "wide",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "name": "wide",
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}"
+        },
+        "after": {
+          "name": "wide",
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"s3:*\",\"Resource\":\"*\"}]}"
+        },
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "aws_s3_bucket.logs",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["no-op"],
+        "before": {"bucket": "demo-logs", "acl": "private"},
+        "after": {"bucket": "demo-logs", "acl": "private"},
+        "after_unknown": {}
+      }
+    },
+    {
+      "address": "data.aws_iam_policy_document.assume",
+      "mode": "data",
+      "type": "aws_iam_policy_document",
+      "name": "assume",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["read"],
+        "before": null,
+        "after": {},
+        "after_unknown": {}
+      }
+    }
+  ]
+}

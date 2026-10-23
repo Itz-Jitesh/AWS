@@ -1,0 +1,17 @@
+diff --git a/s3.tf b/s3.tf
+--- a/s3.tf
++++ b/s3.tf
+@@ -1,6 +1,16 @@
+ resource "aws_s3_bucket" "public_data" {
+   bucket = "demo-public-data"
+-  acl    = "public-read"
++  acl    = "private"
++}
++
++resource "aws_s3_bucket_public_access_block" "public_data" {
++  bucket                  = aws_s3_bucket.public_data.id
++  block_public_acls       = true
++  block_public_policy     = true
++  ignore_public_acls      = true
++  restrict_public_buckets = true
+ }

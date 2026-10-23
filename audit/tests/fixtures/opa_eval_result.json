@@ -1,0 +1,35 @@
+{
+  "result": [
+    {
+      "expressions": [
+        {
+          "value": [
+            {
+              "rule": "TF_S3_PUBLIC_ACL",
+              "title": "S3 bucket ACL grants public access",
+              "severity": "high",
+              "resource": "aws_s3_bucket.public_data",
+              "msg": "planned ACL \"public-read\" on aws_s3_bucket.public_data grants public access"
+            },
+            {
+              "rule": "TF_IAM_WILDCARD_RESOURCE",
+              "title": "IAM policy allows wildcard resource",
+              "severity": "high",
+              "resource": "aws_iam_policy.wide",
+              "msg": "planned policy on aws_iam_policy.wide allows Action on Resource *"
+            },
+            {
+              "rule": "TF_PLAN_DESTRUCTIVE_ACTION",
+              "title": "Planned destructive action",
+              "severity": "high",
+              "resource": "aws_s3_bucket.public_data",
+              "msg": "plan includes destructive action for aws_s3_bucket.public_data: [\"delete\"]"
+            }
+          ],
+          "name": "data.planproof.deny.deny",
+          "location": {"row": 1, "col": 1}
+        }
+      ]
+    }
+  ]
+}
