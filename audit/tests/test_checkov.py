@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from audit.checkov import run_checkov
@@ -79,7 +81,7 @@ def test_argv_is_fixed_argument_array(tmp_bin, tmp_path) -> None:
     assert args[0] == "-d"
     assert str(tmp_path) in args
     assert "-o" in args and "json" in args
-    assert "--quiet" in args
+    assert "--quiet" not in args
     assert not any("&&" in arg or ";" in arg for arg in args)
 
 
@@ -167,3 +169,60 @@ def test_entry_without_check_id_makes_whole_scan_unable_to_verify(
     [finding] = run_checkov(tmp_path, executable=str(fake))
     assert finding["status"] == "UnableToVerify"
     assert finding["rule_id"] == "scanner.checkov.malformed_output"
+
+
+def test_parsing_errors_add_partial_scan_gap(tmp_bin, tmp_path) -> None:
+    payload = (
+        '{"results": {"failed_checks": [{"check_id": "CKV_AWS_20", "status": "FAILED",'
+        ' "resource": "aws_s3_bucket.a", "check_name": "public acl",'
+        ' "file_path": "s3.tf", "file_line_range": [1, 2]}],'
+        ' "passed_checks": [], "skipped_checks": [],'
+        ' "parsing_errors": [{"file_path": "broken.tf", "error": "invalid HCL"}]},'
+        ' "summary": {"passed": 0, "failed": 1, "parsing_errors": 1}}'
+    )
+    fake = make_executable(tmp_bin, "fake_checkov", f'#!/bin/sh\necho \'{payload}\'\n')
+    findings = run_checkov(tmp_path, executable=str(fake))
+    for finding in findings:
+        validate(finding, "finding")
+    statuses = {f["status"] for f in findings}
+    assert "Failed" in statuses
+    gap = next(f for f in findings if f["rule_id"] == "scanner.checkov.partial_scan")
+    assert gap["status"] == "UnableToVerify"
+    assert "incomplete" in gap["evidence"]
+    assert "broken.tf" in gap["evidence"]
+
+
+def test_clean_scan_returns_passed_findings_not_notconfigured(tmp_bin, tmp_path) -> None:
+    payload = (
+        '{"results": {"failed_checks": [], "skipped_checks": [],'
+        ' "passed_checks": [{"check_id": "CKV_AWS_18", "check_name": "logging",'
+        ' "resource": "aws_s3_bucket.logs", "file_path": "main.tf"}]},'
+        ' "summary": {"passed": 1, "failed": 0, "parsing_errors": 0}}'
+    )
+    fake = make_executable(tmp_bin, "fake_checkov", f'#!/bin/sh\necho \'{payload}\'\n')
+    findings = run_checkov(tmp_path, executable=str(fake))
+    assert [f["status"] for f in findings] == ["Passed"]
+    assert all(f["status"] != "NotConfigured" for f in findings)
+
+
+_REAL_CHECKOV = Path(__file__).resolve().parents[2] / ".venv" / "bin" / "checkov"
+
+
+@pytest.mark.skipif(not _REAL_CHECKOV.is_file(), reason="real checkov not installed in .venv")
+def test_real_checkov_scan_produces_policy_findings(tmp_path) -> None:
+    (tmp_path / "main.tf").write_text(
+        'resource "aws_s3_bucket" "public_data" {\n'
+        '  bucket = "demo-public-data"\n'
+        '  acl    = "public-read"\n'
+        '}\n'
+    )
+    findings = run_checkov(tmp_path, executable=str(_REAL_CHECKOV), timeout_sec=180)
+    for finding in findings:
+        validate(finding, "finding")
+        assert finding["status"] != "UnableToVerify"
+    assert any(f["status"] == "Failed" for f in findings)
+    failed = next(f for f in findings if f["status"] == "Failed")
+    assert failed["rule_source"] == "checkov"
+    assert failed["resource_address"]
+    assert failed["evidence"]
+    assert failed["line_start"] >= 1

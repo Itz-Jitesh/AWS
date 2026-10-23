@@ -56,7 +56,7 @@ def run_checkov(
 
     with tempfile.TemporaryDirectory(prefix="planproof-checkov-") as tmp:
         result = run_argv(
-            [path, "-d", str(ws), "-o", "json", "--quiet"],
+            [path, "-d", str(ws), "-o", "json"],
             cwd=tmp,
             timeout_sec=timeout_sec,
         )
@@ -142,7 +142,11 @@ def _findings_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
             )
         ]
 
+    coverage_gap = _parsing_error_finding(results)
+
     if not raw_findings:
+        if coverage_gap is not None:
+            return [coverage_gap]
         summary = _summary_of(payload, results)
         detail = "checkov returned no check results"
         if summary:
@@ -150,13 +154,31 @@ def _findings_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
         return [operational_finding(TOOL, "no_results", detail, status="NotConfigured")]
 
     try:
-        return normalize(raw_findings)
+        findings = normalize(raw_findings)
     except NormalizationError as exc:
         return [
             operational_finding(
                 TOOL, "malformed_output", f"checkov results could not be normalized: {exc}"
             )
         ]
+    if coverage_gap is not None:
+        findings.append(coverage_gap)
+    return findings
+
+
+def _parsing_error_finding(results: dict[str, Any]) -> dict[str, Any] | None:
+    errors = results.get("parsing_errors")
+    if not isinstance(errors, list) or not errors:
+        return None
+    detail = json.dumps(errors[:5], default=str)
+    if len(detail) > 500:
+        detail = detail[:500] + "..."
+    return operational_finding(
+        TOOL,
+        "partial_scan",
+        f"checkov could not parse {len(errors)} file(s); per-check results are "
+        f"incomplete and must not be read as a full pass: {detail}",
+    )
 
 
 def _map_entry(entry: Any, status: str) -> dict[str, Any]:
