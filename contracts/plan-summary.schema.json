@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://planproof.local/contracts/plan-summary.schema.json",
+  "title": "PlanSummary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_digest",
+    "create",
+    "update",
+    "replace",
+    "destroy",
+    "destructive_actions",
+    "has_changes"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "plan_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "create": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "update": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "replace": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "destroy": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "destructive_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "address",
+          "actions",
+          "risk"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "create",
+                "update",
+                "delete",
+                "read",
+                "no-op"
+              ]
+            }
+          },
+          "risk": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "has_changes": {
+      "type": "boolean"
+    }
+  }
+}

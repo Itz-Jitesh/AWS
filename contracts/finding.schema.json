@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://planproof.local/contracts/finding.schema.json",
+  "title": "Finding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "finding_id",
+    "rule_source",
+    "rule_id",
+    "severity",
+    "status",
+    "title",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "finding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rule_source": {
+      "type": "string",
+      "enum": [
+        "checkov",
+        "opa",
+        "terraform",
+        "custom"
+      ]
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info",
+        "unknown"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Passed",
+        "Failed",
+        "Skipped",
+        "NotConfigured",
+        "UnableToVerify"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "resource_address": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "file_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "line_start": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "remediation": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fingerprint": {
+      "type": "string"
+    }
+  }
+}

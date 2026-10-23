@@ -1,0 +1,18 @@
+# Secrets and local environments
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+node_modules/
+.next/
+dist/
+build/
+*.tfstate
+*.tfstate.*
+.terraform/
+plan-artifacts/
+workspace-data/
