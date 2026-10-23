@@ -9,12 +9,12 @@ from .base import LLMAdapter, LLMRequest, LLMResponse
 PostJson = Callable[[str, dict], dict]
 
 
-def _default_post(url: str, payload: dict) -> dict:
+def _default_post(url: str, payload: dict, timeout: int = 60) -> dict:
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url, data=body, headers={"Content-Type": "application/json"}, method="POST"
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -24,8 +24,8 @@ class OllamaAdapter(LLMAdapter):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.model_id = f"ollama/{model}"
-        self._post = post_json or _default_post
         self.timeout = timeout
+        self._post = post_json or (lambda url, payload: _default_post(url, payload, timeout))
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         prompt = request.prompt
@@ -35,7 +35,8 @@ class OllamaAdapter(LLMAdapter):
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "options": {"num_predict": request.max_tokens},
+            "keep_alive": "10m",
+            "options": {"num_predict": request.max_tokens, "temperature": 0},
         }
         try:
             data = self._post(f"{self.base_url}/api/generate", payload)

@@ -33,14 +33,26 @@ class HttpWorkerClient:
             base_url=self.base_url, timeout=timeout, transport=transport
         )
 
+    # The worker owns the workspace by task id and fixes the mandatory check
+    # pipeline server-side; clients never pass filesystem paths or a subset.
+    MANDATORY_CHECKS = ["fmt", "init", "validate", "plan", "show_json"]
+
     def run_check_suite(self, workspace: str, task_id: str) -> list[CheckRun]:
-        return self._post("/check", workspace, task_id, "checks", CheckRun)
+        return self._post(
+            "/check",
+            {"task_id": task_id, "checks": self.MANDATORY_CHECKS},
+            "runs",
+            CheckRun,
+        )
 
     def capture_plan_json(self, workspace: str, task_id: str) -> dict | None:
-        return self._post("/capture", workspace, task_id, "plan_json", None)
+        data = self._post_raw("/capture", {"task_id": task_id})
+        if not data.get("available"):
+            return None
+        plan = data.get("redacted_plan")
+        return plan if isinstance(plan, dict) else None
 
-    def _post(self, path: str, workspace: str, task_id: str, key: str, item_model):
-        payload = {"workspace": workspace, "task_id": task_id}
+    def _post_raw(self, path: str, payload: dict) -> dict:
         try:
             response = self._client.post(path, json=payload)
         except httpx.HTTPError as exc:
@@ -53,17 +65,21 @@ class HttpWorkerClient:
             data = response.json()
         except ValueError as exc:
             raise WorkerUnavailableError(f"worker {path} returned non-JSON body") from exc
-        if not isinstance(data, dict) or key not in data:
+        if not isinstance(data, dict):
+            raise WorkerUnavailableError(f"worker {path} returned non-object JSON")
+        return data
+
+    def _post(self, path: str, payload: dict, key: str, item_model):
+        data = self._post_raw(path, payload)
+        if key not in data:
             raise WorkerUnavailableError(f"worker {path} response missing '{key}'")
         value = data[key]
-        if item_model is None:
-            return value if isinstance(value, dict) else None
         if not isinstance(value, list):
             raise WorkerUnavailableError(f"worker {path} field '{key}' must be a list")
         try:
             return [item_model.model_validate(item) for item in value]
         except ValueError as exc:
-            raise WorkerUnavailableError(f"worker {path} returned invalid CheckRun: {exc}") from exc
+            raise WorkerUnavailableError(f"worker {path} returned invalid {key}: {exc}") from exc
 
     def close(self) -> None:
         self._client.close()
@@ -98,7 +114,7 @@ class HttpAuditClient:
             raise AuditError(f"audit returned invalid Requirement: {exc}") from exc
 
     def classify_plan(self, workspace: str, plan_json: dict) -> PlanSummary:
-        data = self._request("/plan/classify", {"workspace": workspace, "plan_json": plan_json})
+        data = self._request("/plan/classify", {"plan_json": plan_json})
         try:
             return PlanSummary.model_validate(data.get("plan_summary", data))
         except ValueError as exc:

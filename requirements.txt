@@ -1,0 +1,14 @@
+# PlanProof local-first runtime dependencies.
+# Install with: uv pip install -r requirements.txt && uv pip install -e ai
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6
+httpx>=0.27
+python-multipart>=0.0.9
+jsonschema>=4.21
+rfc3339-validator>=0.1.4
+pytest>=8
+# Retained only for the disabled SageMaker adapter tests; no AWS calls locally.
+boto3>=1.34
+# Findings scanner (validated version used by Agent D).
+checkov==3.3.30

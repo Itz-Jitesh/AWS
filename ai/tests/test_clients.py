@@ -18,8 +18,10 @@ def test_worker_check_suite_parses_contract():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/check"
         body = json.loads(request.content)
-        assert body == {"workspace": "/ws", "task_id": "t1"}
-        return httpx.Response(200, json={"checks": [check_json]})
+        assert "workspace" not in body
+        assert body["task_id"] == "t1"
+        assert body["checks"] == ["fmt", "init", "validate", "plan", "show_json"]
+        return httpx.Response(200, json={"task_id": "t1", "runs": [check_json]})
 
     client = worker_client(handler)
     checks = client.run_check_suite("/ws", "t1")
@@ -44,7 +46,7 @@ def test_worker_transport_error_becomes_unavailable():
 
 
 def test_worker_missing_field_becomes_unavailable():
-    client = worker_client(lambda request: httpx.Response(200, json={"checks": {}}))
+    client = worker_client(lambda request: httpx.Response(200, json={"runs": {}}))
     with pytest.raises(WorkerUnavailableError):
         client.run_check_suite("/ws", "t1")
 
@@ -53,7 +55,7 @@ def test_worker_invalid_checkrun_becomes_unavailable():
     bad = make_check("fmt", "Passed").model_dump(mode="json")
     bad["status"] = "Secure"
     client = worker_client(
-        lambda request: httpx.Response(200, json={"checks": [bad]})
+        lambda request: httpx.Response(200, json={"runs": [bad]})
     )
     with pytest.raises(WorkerUnavailableError):
         client.run_check_suite("/ws", "t1")
@@ -62,11 +64,27 @@ def test_worker_invalid_checkrun_becomes_unavailable():
 def test_worker_capture_plan_json():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/capture"
-        return httpx.Response(200, json={"plan_json": {"format_version": "1.2"}})
+        body = json.loads(request.content)
+        assert body == {"task_id": "t1"}
+        return httpx.Response(
+            200,
+            json={
+                "available": True,
+                "plan_digest": "a" * 64,
+                "redacted_plan": {"format_version": "1.2"},
+            },
+        )
 
     client = worker_client(handler)
     plan = client.capture_plan_json("/ws", "t1")
     assert plan == {"format_version": "1.2"}
+
+
+def test_worker_capture_unavailable_returns_none():
+    client = worker_client(
+        lambda request: httpx.Response(200, json={"available": False, "reason": "missing plan"})
+    )
+    assert client.capture_plan_json("/ws", "t1") is None
 
 
 def test_worker_capture_error():

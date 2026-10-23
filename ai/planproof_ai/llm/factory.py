@@ -19,7 +19,11 @@ def create_adapter(config: AIConfig | None = None) -> LLMAdapter:
     config = config or AIConfig.from_env()
     backend = resolve_backend(config)
     if backend == "ollama":
-        return OllamaAdapter(base_url=config.ollama_base_url, model=config.model_id)
+        return OllamaAdapter(
+            base_url=config.ollama_base_url,
+            model=config.model_id,
+            timeout=config.ollama_timeout_s,
+        )
     if backend == "sagemaker":
         return SageMakerAdapter(
             endpoint_name=config.sagemaker_endpoint_name,

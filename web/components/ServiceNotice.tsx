@@ -5,7 +5,7 @@ import type { Operation, PlanProofApi, SupportLevel } from "@/lib/api";
 const BACKEND_LABELS: Record<PlanProofApi["backend"], string> = {
   mock: "Mock services (demonstration data)",
   "worker-direct": "Live worker service (direct)",
-  orchestration: "Live API (orchestration, unverified)",
+  orchestration: "Live API (local orchestration)",
 };
 
 const OPERATION_LABELS: Record<Operation, string> = {
@@ -51,9 +51,8 @@ export function ServiceNotice({ api }: { api: PlanProofApi }) {
         <p className="text-xs text-amber-200/80">{BACKEND_LABELS[api.backend]}</p>
       </div>
       <p className="mt-1 text-xs text-ink-muted">
-        Live mode is active; demonstration data is never substituted for a live
-        response. Operations below are limited by contracts that are missing or not
-        yet implemented.
+        Demonstration data is never substituted for a live response. Operations
+        below are limited by contracts that are missing or not yet implemented.
       </p>
       <ul className="mt-2 flex flex-col gap-1">
         {entries.map((entry) => (

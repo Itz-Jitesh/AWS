@@ -40,9 +40,9 @@ function actionMessage(error: unknown, fallback: string): string {
 
 export function TaskWorkspace({ taskId }: { taskId: string }) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [busy, setBusy] = useState<"checks" | "patch" | "requirements" | "capture" | null>(
-    null,
-  );
+  const [busy, setBusy] = useState<
+    "checks" | "patch" | "requirements" | "capture" | "apply" | null
+  >(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -131,6 +131,28 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
   async function approve(digest: string) {
     await getApiClient().approveTask(taskId, digest);
     await refresh();
+  }
+
+  async function applyPatch() {
+    const api = getApiClient();
+    if (!api.applyPatch) return;
+    if (
+      !window.confirm(
+        "Apply this patch to the local task workspace? The workspace files will change and checks must be re-run.",
+      )
+    ) {
+      return;
+    }
+    setActionError(null);
+    setBusy("apply");
+    try {
+      await api.applyPatch(taskId);
+      await refresh();
+    } catch (error) {
+      setActionError(actionMessage(error, "Patch application failed."));
+    } finally {
+      setBusy(null);
+    }
   }
 
   if (state.kind === "loading") {
@@ -425,7 +447,20 @@ export function TaskWorkspace({ taskId }: { taskId: string }) {
         description="Minimal unified diff. The repository is never rewritten wholesale."
         testId="panel-patch"
       >
-        <PatchPanel patch={workspace.patch} unavailableReason={patchUnavailable} />
+        <PatchPanel
+          patch={workspace.patch}
+          unavailableReason={patchUnavailable}
+          appliedAt={workspace.patch_applied_at}
+          applying={busy === "apply"}
+          onApply={
+            workspace.patch &&
+            workspace.patch_applied_at == null &&
+            task.mode === "build" &&
+            api.applyPatch
+              ? applyPatch
+              : undefined
+          }
+        />
       </Panel>
 
       <Panel

@@ -8,9 +8,15 @@ import { EmptyState } from "./Panel";
 export function PatchPanel({
   patch,
   unavailableReason,
+  appliedAt,
+  applying,
+  onApply,
 }: {
   patch: Patch | null;
   unavailableReason?: string;
+  appliedAt?: string | null;
+  applying?: boolean;
+  onApply?: () => void;
 }) {
   if (!patch) {
     return (
@@ -78,6 +84,33 @@ export function PatchPanel({
       ) : null}
 
       <DiffViewer diff={patch.unified_diff} />
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3">
+        {appliedAt ? (
+          <p className="text-sm text-ink-muted" data-testid="patch-applied">
+            Applied to the local workspace at{" "}
+            <span className="font-mono text-xs">{appliedAt}</span>. Re-run checks and
+            capture the plan again before approval.
+          </p>
+        ) : (
+          <>
+            <button
+              type="button"
+              data-testid="apply-patch"
+              disabled={!onApply || applying}
+              onClick={onApply}
+              className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {applying ? "Applying patch…" : "Apply patch to workspace"}
+            </button>
+            <p className="text-xs text-ink-dim">
+              Writes the validated diff into the local task workspace only. Nothing is
+              applied to cloud infrastructure; the patch is rejected if the workspace
+              changed since generation.
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }

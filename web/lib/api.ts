@@ -43,6 +43,7 @@ export interface TaskWorkspace {
   approval: ApprovalRecord | null;
   ingest?: IngestSummary | null;
   plan_capture?: PlanCapture | null;
+  patch_applied_at?: string | null;
 }
 
 export interface CheckSuiteResponse {
@@ -141,5 +142,6 @@ export interface PlanProofApi {
   generatePatch?(taskId: string): Promise<PatchResponse>;
   extractRequirements?(taskId: string, goal: string): Promise<Requirement[]>;
   capturePlan?(taskId: string): Promise<PlanCapture>;
+  applyPatch?(taskId: string): Promise<TaskWorkspace>;
   operationNotes?(): Partial<Record<Operation, OperationNote>>;
 }

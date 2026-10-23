@@ -1,0 +1,17 @@
+{
+  "name": "planproof",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Local-first PlanProof: Next.js UI + local worker, AI, and audit services",
+  "scripts": {
+    "setup": "scripts/setup-local.sh",
+    "doctor": "scripts/doctor.sh",
+    "dev": "scripts/dev.sh",
+    "start": "scripts/dev.sh",
+    "test": "scripts/test-all.sh",
+    "test:web": "npm --prefix web test",
+    "typecheck": "cd web && npx next typegen && npx tsc --noEmit",
+    "lint": "npm --prefix web run lint",
+    "build": "npm --prefix web run build"
+  }
+}

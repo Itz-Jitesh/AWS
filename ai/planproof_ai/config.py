@@ -20,6 +20,7 @@ class AIConfig:
     model_id: str = "mock-llm-v1"
     model_mode: str = "merged"
     ollama_base_url: str = "http://localhost:11434"
+    ollama_timeout_s: int = 300
     sagemaker_endpoint_name: str = ""
     sagemaker_region: str = ""
     sagemaker_payload_mode: str = "planproof"
@@ -67,6 +68,7 @@ class AIConfig:
             model_id=model_id,
             model_mode=env.get("MODEL_MODE", "merged"),
             ollama_base_url=env.get("OLLAMA_BASE_URL", "http://localhost:11434"),
+            ollama_timeout_s=_int("OLLAMA_TIMEOUT_S", 300),
             sagemaker_endpoint_name=endpoint,
             sagemaker_region=region,
             sagemaker_payload_mode=payload_mode,
